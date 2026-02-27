@@ -30,15 +30,15 @@ The plugin provides the following commands:
 
 *:ZenmodeToggle*
   Toggle Zen Mode. If Zen Mode is on, it will be turned off. If it is off,
-  it will be turned on.
+  it will be turned on. Accepts an optional width argument.
 
 *:ZenmodeOpen*
-  Open Zen Mode.
+  Open Zen Mode. Accepts an optional width argument.
 
 *:ZenmodeClose*
   Close Zen Mode.
 
-You can also use the built-in functions to create your own keymappings. See
+You can also use the API functions to create your own keymappings. See
 |zenmode-api| for more details.
 
 ==============================================================================
@@ -57,10 +57,11 @@ Here is an example configuration with the default values:
       foldcolumn = "0",
       list = false,
       signcolumn = "no",
-      statusline = "",
-    }
-    default_width = 30,
+      laststatus = 0,
+    },
+    default_width = 120,
     untouchable_side_bufs = true,
+    log_level = "warn",
     excluded_filetypes = {
         cmd = true,
         pager = true,
@@ -78,20 +79,23 @@ Here is an example configuration with the default values:
 *zenmode-options*
 The following options can be configured:
 
-`window.options`
+`options`
   A table of Neovim options that will be changed when Zen Mode is toggled.
   You can add any option here and it will be restored when you exit Zen
   Mode.
 
 `default_width`
-  The width of the side buffers that are created to center the main
-  editing window.
-  Default: `30`
+  The width of the centered editor window.
+  Default: `120`
 
 `untouchable_side_bufs`
   If `true`, you won't be able to switch to the side buffers created by
   Zen Mode.
   Default: `true`
+
+`log_level`
+  Log verbosity used by the plugin logger.
+  Default: `warn`
 
 `excluded_filetypes`
   A list of filetypes to exclude from Zen Mode. Windows with these
@@ -134,32 +138,35 @@ The plugin provides a set of functions that can be used to create custom
 keymappings or to control Zen Mode from your own scripts.
 
 >lua
-  local builtin = require("zenmode").builtin()
+  local api = require("zenmode.api")
 
   -- Toggle Zen Mode
   vim.keymap.set("n", "<leader>z", function()
-    builtin.toggle()
+    api.toggle()
   end, { silent = true, desc = "Toggle Zen Mode" })
 
   -- Open Zen Mode
   vim.keymap.set("n", "<leader>zo", function()
-    builtin.open()
+    api.open()
   end, { silent = true, desc = "Open Zen Mode" })
 
   -- Close Zen Mode
   vim.keymap.set("n", "<leader>zc", function()
-    builtin.close()
+    api.close()
   end, { silent = true, desc = "Close Zen Mode" })
 <
 
-`builtin.toggle()`
-  Toggles Zen Mode.
+`api.toggle(input_width?)`
+  Toggles Zen Mode. Accepts an optional positive width.
 
-`builtin.open()`
-  Opens Zen Mode.
+`api.open(input_width?)`
+  Opens Zen Mode. Accepts an optional positive width.
 
-`builtin.close()`
+`api.close()`
   Closes Zen Mode.
+
+`api.state.is_enabled()`
+  Returns `true` if Zen Mode is currently enabled, otherwise `false`.
 
 ==============================================================================
 LICENSE                                            *zenmode-license*

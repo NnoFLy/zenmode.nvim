@@ -48,6 +48,7 @@ require("zenmode").setup({
     },
     default_width = 30,
     untouchable_side_bufs = true,
+    log_level = "warn",
     -- You can override the default callbacks here
     on_before_open = function() end,
     on_after_open = function()
@@ -64,7 +65,7 @@ require("zenmode").setup({
 
 ### Callbacks
 
-The following callbacks are available to hook into the Zen Mode lifecycle:
+The following callbacks are available to hook into the Zen Mode life cycle:
 
 - `on_before_open`: Called just before Zen Mode is opened.
 - `on_after_open`: Called after Zen Mode is fully opened.
@@ -79,19 +80,22 @@ The plugin provides the following commands:
 - `:ZenmodeOpen`: Open Zen Mode.
 - `:ZenmodeClose`: Close Zen Mode.
 
-You can also use the built-in functions to create your own keymappings:
+`ZenmodeToggle` and `ZenmodeOpen` accept an optional width argument,
+e.g. `:ZenmodeToggle 40`.
+
+You can also use the built-in functions to create your own key mappings:
 
 ```lua
-local builtin = require("zenmode").builtin()
+local zenmode_api = require("zenmode.api")
 
 vim.keymap.set("n", "<leader>z", function()
-    builtin.toggle()
+    zenmode_api.toggle()
 end, { silent = true, desc = "Toggle Zen Mode" })
 -- vim.keymap.set("n", "<leader>zo", function()
---   builtin.open()
+--   zenmode_api.open()
 -- end, { silent = true, desc = "Toggle Zen Mode" })
 -- vim.keymap.set("n", "<leader>zc", function()
---   builtin.close()
+--   zenmode_api.close()
 -- end, { silent = true, desc = "Toggle Zen Mode" })
 ```
 

@@ -1,53 +1,6 @@
----@class Opts
----@field options table
----@field default_width integer
----@field untouchable_side_bufs boolean
----@field log_level zenmode.log_level
----@field excluded_filetypes table<string, boolean>
----@field on_before_open fun()
----@field on_after_open fun()
----@field on_before_close fun()
----@field on_after_close fun()
-
----@class Builtin
----@field toggle fun(input_width: integer | nil)
----@field open fun(input_width: integer | nil)
----@field close fun()
-
 local M = {}
 
----@return nil
-local function noop()
-end
-
----@type Opts
-local defaults = {
-    options = {
-        number = false,
-        relativenumber = false,
-        cursorline = false,
-        cursorcolumn = false,
-        foldcolumn = "0",
-        list = false,
-        signcolumn = "no",
-        laststatus = 0,
-    },
-    default_width = 120,
-    untouchable_side_bufs = true,
-    log_level = "debug",
-    excluded_filetypes = {
-        cmd = true,
-        pager = true,
-        qf = true,
-        dialog = true,
-        msg = true,
-    },
-    on_before_open = noop,
-    on_after_open = noop,
-    on_before_close = noop,
-    on_after_close = noop,
-}
-
+local defaults = require("zenmode.default_opts")
 M.opts = vim.deepcopy(defaults)
 
 local zenmode = require("zenmode.zenmode")
@@ -104,32 +57,6 @@ end
 ---@return Opts
 function M.get_opts()
     return M.opts
-end
-
----@return Builtin
-function M.builtin()
-    ---@param input_width integer | nil
-    ---@return nil
-    local function toggle(input_width)
-        return zenmode.toggle(input_width)
-    end
-
-    ---@param input_width integer | nil
-    ---@return nil
-    local function open(input_width)
-        return zenmode.open(input_width)
-    end
-
-    ---@return nil
-    local function close()
-        return zenmode.close()
-    end
-
-    return {
-        toggle = toggle,
-        open = open,
-        close = close,
-    }
 end
 
 return M
