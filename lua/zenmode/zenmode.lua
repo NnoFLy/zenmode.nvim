@@ -91,8 +91,13 @@ function M.close()
 
         vim.api.nvim_set_current_tabpage(current_tab)
         M.close_one(tab)
+        state.remove_tab_by_id(tab.id)
 
         ::continue::
+    end
+
+    if #state.get_tabs() ~= 0 then
+        logger.warn("Some tabs were not closed")
     end
 
     local saved_opts = state.get_saved_opts()

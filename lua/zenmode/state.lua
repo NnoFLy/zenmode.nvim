@@ -48,11 +48,6 @@ function M.set_autocmds_created()
     state.autocmds_created = true
 end
 
----@return zenmode.State
-function M.get_state()
-    return state
-end
-
 ---@return table<string, any>
 function M.get_saved_opts()
     return state.saved_opts
