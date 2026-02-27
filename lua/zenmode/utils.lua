@@ -1,10 +1,88 @@
 local M = {}
 
-function M.save_opts(opts)
-    local saved_opts = {}
-    for opt, _ in pairs(opts) do
-        saved_opts[opt] = vim.opt[opt]
+---@param win integer
+---@param fillchars table<string, string>
+---@return nil
+local function append_fillchars(win, fillchars)
+    pcall(vim.api.nvim_win_call, win, function()
+        vim.opt_local.fillchars:append(fillchars)
+    end)
+end
+
+---@class zenmode.SavedOpts
+---@field global table<string, any>
+---@field win table<integer, table<string, any>>
+
+---@param opt string
+---@return vim.api.keyset.get_option_info
+local function get_option_info(opt)
+    return vim.api.nvim_get_option_info2(opt, {})
+end
+
+---@param opt string
+---@param win integer
+---@return any
+local function get_win_option_value(opt, win)
+    local info = get_option_info(opt)
+    if info.scope == "global" then
+        return vim.api.nvim_get_option_value(opt, { scope = "global" })
     end
+    if info.scope == "buf" then
+        return vim.api.nvim_get_option_value(opt, { buf = vim.api.nvim_win_get_buf(win) })
+    end
+
+    return vim.api.nvim_get_option_value(opt, { win = win })
+end
+
+---@param opt string
+---@param value any
+---@param win integer
+---@return nil
+local function set_option_value(opt, value, win)
+    local info = get_option_info(opt)
+    if info.scope == "global" then
+        vim.api.nvim_set_option_value(opt, value, { scope = "global" })
+        return
+    end
+    if info.scope == "buf" then
+        vim.api.nvim_set_option_value(opt, value, { buf = vim.api.nvim_win_get_buf(win) })
+        return
+    end
+
+    vim.api.nvim_set_option_value(opt, value, { win = win })
+end
+
+---@param opts table<string, any>
+---@return zenmode.SavedOpts
+function M.save_opts(opts)
+    local saved_opts = {
+        global = {},
+        win = {},
+    }
+
+    for _, win in ipairs(vim.api.nvim_list_wins()) do
+        if M.is_excluded(win) then
+            goto continue
+        end
+
+        saved_opts.win[win] = {}
+        for opt, _ in pairs(opts) do
+            local ok, value = pcall(get_win_option_value, opt, win)
+            if ok then
+                saved_opts.win[win][opt] = value
+            end
+        end
+
+        ::continue::
+    end
+
+    for opt, _ in pairs(opts) do
+        local ok, info = pcall(get_option_info, opt)
+        if ok and info.scope == "global" then
+            saved_opts.global[opt] = vim.api.nvim_get_option_value(opt, { scope = "global" })
+        end
+    end
+
     return saved_opts
 end
 
@@ -22,49 +100,49 @@ function M.get_win_count(tab)
 end
 
 ---@param opts table<string, any>
+---@return nil
 function M.apply_opts(opts)
+    if opts.global and opts.win then
+        for opt, value in pairs(opts.global) do
+            pcall(vim.api.nvim_set_option_value, opt, value, { scope = "global" })
+        end
+
+        for win, win_opts in pairs(opts.win) do
+            if not vim.api.nvim_win_is_valid(win) then
+                goto continue
+            end
+
+            for opt, value in pairs(win_opts) do
+                pcall(set_option_value, opt, value, win)
+            end
+
+            ::continue::
+        end
+
+        return
+    end
+
     for _, win in ipairs(vim.api.nvim_list_wins()) do
-        local buf = vim.api.nvim_win_get_buf(win)
-        local filetype = vim.api.nvim_get_option_value("filetype", { buf = buf })
-        if filetype == "" then
+        if M.is_excluded(win) then
             goto continue
         end
 
         for opt, value in pairs(opts) do
-            if M.is_excluded(win) then
-                goto continue
-            end
-
-            vim.api.nvim_set_current_win(win)
-            vim.opt[opt] = value
-
-            ::continue::
+            pcall(set_option_value, opt, value, win)
         end
 
         ::continue::
     end
 end
 
----@param arr any[]
----@param val any
----@return boolean
-function M.include(arr, val)
-    for _, value in pairs(arr) do
-        if val == value then
-            return true
-        end
-    end
-    return false
-end
-
 ---@param width integer
 ---@param direction string
 ---@return integer
-local function create_scratch_window(width, direction)
+function M.create_scratch_window(width, direction)
     vim.cmd("vsp")
     vim.cmd("wincmd " .. direction)
     local buf = vim.api.nvim_create_buf(false, true)
-    vim.cmd("buffer " .. buf)
+    vim.api.nvim_win_set_buf(0, buf)
 
     local win = vim.api.nvim_get_current_win()
 
@@ -80,121 +158,31 @@ local function create_scratch_window(width, direction)
     vim.api.nvim_set_option_value("numberwidth", 1, opts)
     vim.api.nvim_set_option_value("number", false, opts)
     vim.api.nvim_set_option_value("relativenumber", false, opts)
-    vim.api.nvim_set_option_value("fillchars", "eob: ,vert: ", opts)
+    append_fillchars(win, { eob = " ", vert = " " })
 
     return win
+end
+
+---@param tabid integer
+---@return nil
+function M.hide_vertical_split_bar(tabid)
+    for _, win in ipairs(vim.api.nvim_tabpage_list_wins(tabid)) do
+        if M.is_excluded(win) then
+            goto continue
+        end
+
+        append_fillchars(win, { vert = " " })
+
+        ::continue::
+    end
 end
 
 ---@param win integer
 ---@return boolean
 function M.is_excluded(win)
-    local excluded_filetypes = require("zenmode.nvim").get_opts().excluded_filetypes
+    local excluded_filetypes = require("zenmode.nvim").get_opts().excluded_filetypes or {}
     local filetype = vim.api.nvim_get_option_value("filetype", { buf = vim.api.nvim_win_get_buf(win) })
     return not not excluded_filetypes[filetype]
-end
-
----@param current_tab integer
----@param H_win integer
----@param L_win integer
----@return Tab
-local function get_tab_info(current_tab, H_win, L_win)
-    ---@type Win[]
-    local centred_wins = {}
-    for _, win in pairs(vim.api.nvim_tabpage_list_wins(current_tab)) do
-        if win == H_win or win == L_win then goto continue end
-        if M.is_excluded(win) then goto continue end
-        table.insert(centred_wins, {
-            winid = win,
-            bufid = vim.api.nvim_win_get_buf(win),
-        })
-
-        ::continue::
-    end
-
-    ---@type Tab
-    local tab = {
-        M = centred_wins,
-        H = {
-            winid = H_win,
-            bufid = vim.api.nvim_win_get_buf(H_win)
-        },
-        L = {
-            winid = L_win,
-            bufid = vim.api.nvim_win_get_buf(L_win)
-        },
-        id = current_tab
-    }
-
-    return tab
-end
-
----@param old_tab_info Tab
----@return Tab
-function M.update_tab_info(old_tab_info)
-    ---@type Win[]
-    local centred_wins = {}
-    for _, win in pairs(vim.api.nvim_tabpage_list_wins(old_tab_info.id)) do
-        if win == old_tab_info.L.winid or win == old_tab_info.H.winid then
-            goto continue
-        end
-        if M.is_excluded(win) then goto continue end
-        table.insert(centred_wins, {
-            winid = win,
-            bufid = vim.api.nvim_win_get_buf(win),
-        })
-
-        ::continue::
-    end
-
-    ---@type Tab
-    local tab = {
-        M = centred_wins,
-        H = old_tab_info.H,
-        L = old_tab_info.L,
-        id = old_tab_info.id
-    }
-
-    return tab
-end
-
----@param width integer
----@return Tab
-function M.zenmode_open_one(width)
-    local cur_win = vim.fn.win_getid()
-
-    local H_win = create_scratch_window(width, "H")
-    local L_win = create_scratch_window(width, "L")
-    local current_tab = vim.api.nvim_get_current_tabpage()
-
-    local tab = get_tab_info(current_tab, H_win, L_win)
-
-    vim.api.nvim_set_option_value(
-        "fillchars",
-        "eob: ,vert: ",
-        {
-            scope = "local",
-            win = cur_win
-        }
-    )
-
-    vim.api.nvim_set_current_win(cur_win)
-
-    return tab
-end
-
----@param tab Tab
-function M.zenmode_close_one(tab)
-    if vim.api.nvim_win_is_valid(tab.H.winid) then
-        vim.api.nvim_win_close(tab.H.winid, true)
-    end
-    if vim.api.nvim_win_is_valid(tab.L.winid) then
-        local ok, _ = pcall(vim.api.nvim_win_close, tab.L.winid, true)
-        if not ok then
-            vim.cmd("split")
-            vim.api.nvim_set_current_buf(vim.fn.bufnr("#"))
-            vim.api.nvim_win_close(tab.L.winid, true)
-        end
-    end
 end
 
 return M
