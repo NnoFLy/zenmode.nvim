@@ -18,7 +18,7 @@ Using [lazy.nvim](https://github.com/folke/lazy.nvim):
 
 ```lua
 {
-    "i0i-i0i/zenmode.nvim",
+    "NnoFLy/zenmode.nvim",
     config = function()
         require("zenmode").setup({
             -- your configuration comes here
